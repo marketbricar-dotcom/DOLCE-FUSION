@@ -8,7 +8,6 @@ import SalesHistory from './components/SalesHistory';
 import CurrencyCalculator from './components/CurrencyCalculator';
 import DailyClose from './components/DailyClose';
 
-// Fallback para generar IDs únicos si crypto.randomUUID no está disponible
 const generateId = () => {
   if (typeof crypto !== 'undefined' && crypto.randomUUID) {
     return crypto.randomUUID();
@@ -33,8 +32,20 @@ const NavItem: React.FC<{active: boolean, onClick: () => void, icon: React.React
 );
 
 const App: React.FC = () => {
-  // State
-  const [exchangeRate, setExchangeRate] = useState<number>(45.50);
+  // Tasa de cambio oficial de la app
+  const [exchangeRate, setExchangeRate] = useState<number>(() => {
+    try {
+      const saved = localStorage.getItem('dolce_exchange_rate');
+      return saved ? parseFloat(saved) : 45.50;
+    } catch (e) {
+      return 45.50;
+    }
+  });
+
+  // Estado temporal para el input de la tasa
+  const [tempRate, setTempRate] = useState<string>(exchangeRate.toString());
+  const [showSavedMsg, setShowSavedMsg] = useState(false);
+
   const [inventory, setInventory] = useState<Product[]>(() => {
     try {
       const saved = localStorage.getItem('chicha_inventory');
@@ -43,6 +54,7 @@ const App: React.FC = () => {
       return INITIAL_PRODUCTS;
     }
   });
+
   const [sales, setSales] = useState<Sale[]>(() => {
     try {
       const saved = localStorage.getItem('chicha_sales');
@@ -51,14 +63,15 @@ const App: React.FC = () => {
       return [];
     }
   });
+
   const [logoUrl, setLogoUrl] = useState<string>(() => {
     return localStorage.getItem('dolce_fusion_logo') || "https://cdn-icons-png.flaticon.com/512/3130/3130432.png";
   });
+
   const [currentView, setCurrentView] = useState<View>(View.POS);
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  // Persistence
   useEffect(() => {
     localStorage.setItem('chicha_inventory', JSON.stringify(inventory));
   }, [inventory]);
@@ -71,7 +84,19 @@ const App: React.FC = () => {
     localStorage.setItem('dolce_fusion_logo', logoUrl);
   }, [logoUrl]);
 
-  // Handlers
+  // Manejador manual para actualizar la tasa
+  const handleUpdateRate = () => {
+    const newRate = parseFloat(tempRate);
+    if (!isNaN(newRate) && newRate > 0) {
+      setExchangeRate(newRate);
+      localStorage.setItem('dolce_exchange_rate', newRate.toString());
+      setShowSavedMsg(true);
+      setTimeout(() => setShowSavedMsg(false), 3000);
+    } else {
+      alert("Por favor ingresa una tasa válida");
+    }
+  };
+
   const addProduct = (product: Product) => {
     setInventory(prev => [...prev, product]);
   };
@@ -185,17 +210,29 @@ const App: React.FC = () => {
         </nav>
 
         <div className="p-6 bg-amber-50/50 border-t border-amber-100 mt-auto">
-          <label className="block text-[10px] font-black text-black uppercase mb-2 text-center tracking-widest">Tasa del Día</label>
-          <div className="relative group">
-            <span className="absolute left-3 top-1/2 -translate-y-1/2 text-black font-bold">Bs.</span>
-            <input 
-              type="number" 
-              value={exchangeRate}
-              onChange={(e) => setExchangeRate(parseFloat(e.target.value) || 0)}
-              className="w-full pl-10 pr-4 py-3 bg-white border border-amber-200 rounded-2xl focus:ring-2 focus:ring-[#d61c2e] focus:border-[#d61c2e] transition-all font-mono text-xl font-black text-black shadow-inner text-center"
-            />
+          <label className="block text-[10px] font-black text-black uppercase mb-2 text-center tracking-widest">Tasa del Día (Manual)</label>
+          <div className="space-y-2">
+            <div className="relative">
+              <span className="absolute left-3 top-1/2 -translate-y-1/2 text-black font-bold text-xs">Bs.</span>
+              <input 
+                type="number" 
+                step="0.01"
+                value={tempRate}
+                onChange={(e) => setTempRate(e.target.value)}
+                className="w-full pl-10 pr-4 py-2.5 bg-white border border-amber-200 rounded-xl focus:ring-2 focus:ring-[#d61c2e] outline-none font-black text-lg text-center shadow-inner"
+              />
+            </div>
+            <button 
+              onClick={handleUpdateRate}
+              className="w-full py-2.5 bg-black text-white rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-gray-800 transition-colors shadow-md"
+            >
+              Actualizar Tasa
+            </button>
+            {showSavedMsg && (
+              <p className="text-[9px] text-green-600 font-bold text-center uppercase animate-pulse">¡Tasa Guardada!</p>
+            )}
           </div>
-          <p className="text-[10px] text-black mt-2 text-center font-bold uppercase">1 USD EQUIVALE A BS.</p>
+          <p className="text-[8px] text-black/40 mt-3 text-center font-bold uppercase">La tasa NO cambiará hasta que presiones Actualizar</p>
         </div>
       </aside>
 
@@ -210,8 +247,8 @@ const App: React.FC = () => {
           </h2>
           <div className="flex items-center gap-4">
              <div className="bg-[#f5e6d8] text-black px-5 py-2 rounded-2xl text-sm font-black border border-amber-200 shadow-sm flex items-center gap-2">
-                <span className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></span>
-                1$ = {formatCurrency(exchangeRate, 'VES')}
+                <span className="w-2 h-2 bg-green-500 rounded-full"></span>
+                Tasa Activa: {formatCurrency(exchangeRate, 'VES')}
              </div>
           </div>
         </header>

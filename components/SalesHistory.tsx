@@ -1,7 +1,8 @@
 
-import React, { useMemo, useState } from 'react';
+import React, { useMemo, useState, useRef } from 'react';
 import { Sale, PaymentMethod } from '../types';
 import { Icons } from '../constants';
+import * as ReactToPrint from 'react-to-print';
 
 const StatCard: React.FC<{label: string, value: string, sub: string}> = ({ label, value, sub }) => (
   <div className="bg-white p-6 rounded-3xl border border-amber-100 shadow-sm text-black">
@@ -32,19 +33,25 @@ const SalesHistory: React.FC<Props> = ({ sales, formatCurrency, onDeleteSale }) 
   const [filterMethod, setFilterMethod] = useState<PaymentMethod | 'ALL'>('ALL');
   const [startDate, setStartDate] = useState<string>('');
   const [endDate, setEndDate] = useState<string>('');
+  
+  const contentToPrint = useRef<HTMLDivElement>(null);
+  
+  // Acceso seguro al hook useReactToPrint
+  const usePrint = (ReactToPrint as any).useReactToPrint || ReactToPrint.useReactToPrint;
+  
+  const handlePrint = usePrint({
+    contentRef: contentToPrint,
+    documentTitle: `Reporte_Ventas_DolceFusión_${new Date().toLocaleDateString()}`
+  });
 
-  // Filtrado de ventas por búsqueda, método y rango de fechas
   const filteredSales = useMemo(() => {
     return sales.filter(sale => {
-      // Búsqueda por nombre o referencia
       const matchesSearch = sale.items.some(item => 
         item.name.toLowerCase().includes(searchTerm.toLowerCase())
       ) || (sale.reference?.toLowerCase().includes(searchTerm.toLowerCase()));
       
-      // Filtro por método
       const matchesMethod = filterMethod === 'ALL' || sale.paymentMethod === filterMethod;
       
-      // Filtro por rango de fechas
       const saleDate = new Date(sale.timestamp);
       saleDate.setHours(0, 0, 0, 0);
       
@@ -95,46 +102,58 @@ const SalesHistory: React.FC<Props> = ({ sales, formatCurrency, onDeleteSale }) 
 
   return (
     <div className="max-w-6xl mx-auto space-y-8 text-black animate-in fade-in duration-500">
-      {/* Panel de Filtros Avanzado */}
-      <div className="bg-white p-6 md:p-8 rounded-[2.5rem] border border-amber-100 shadow-md space-y-6 text-black">
-        <div className="flex flex-col md:flex-row gap-4 items-center">
-          {/* Búsqueda */}
-          <div className="relative flex-1 w-full">
-            <span className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400">
-              <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>
-            </span>
-            <input 
-              type="text"
-              placeholder="Buscar bebida o referencia..."
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              className="w-full pl-12 pr-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl focus:ring-2 focus:ring-black outline-none font-bold text-sm transition-all"
-            />
-          </div>
-          
-          {/* Métodos de Pago */}
-          <div className="flex gap-2 w-full md:w-auto overflow-x-auto pb-2 md:pb-0 scrollbar-hide">
-            <button 
-              onClick={() => setFilterMethod('ALL')}
-              className={`px-4 py-3 rounded-2xl text-[10px] font-black uppercase tracking-widest whitespace-nowrap transition-all border ${filterMethod === 'ALL' ? 'bg-black text-white border-black shadow-md' : 'bg-white text-black border-amber-100 hover:border-black'}`}
-            >
-              Todos
-            </button>
-            {(['CASH_USD', 'PAGO_MOVIL', 'CASH_VES', 'CARD'] as PaymentMethod[]).map(method => (
-              <button 
-                key={method}
-                onClick={() => setFilterMethod(method)}
-                className={`px-4 py-3 rounded-2xl text-[10px] font-black uppercase tracking-widest whitespace-nowrap transition-all border ${filterMethod === method ? 'bg-black text-white border-black shadow-md' : 'bg-white text-black border-amber-100 hover:border-black'}`}
-              >
-                {getPaymentLabel(method)}
-              </button>
-            ))}
+      {/* Panel de Filtros Avanzado - Oculto en impresión */}
+      <div className="bg-white p-6 md:p-8 rounded-[2.5rem] border border-amber-100 shadow-md space-y-6 text-black print:hidden">
+        <div className="flex flex-col md:flex-row gap-4 items-center justify-between">
+          <div className="flex-1 w-full space-y-4">
+             <div className="flex items-center justify-between">
+                <h3 className="text-lg font-black uppercase tracking-tight">Filtrar Historial</h3>
+                <button 
+                  onClick={() => handlePrint()}
+                  className="bg-[#d61c2e] text-white px-6 py-3 rounded-2xl font-black text-xs uppercase tracking-widest hover:bg-red-700 transition-all shadow-lg flex items-center gap-2"
+                >
+                  <Icons.Report /> Exportar PDF
+                </button>
+             </div>
+             
+             <div className="relative w-full">
+                <span className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400">
+                  <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>
+                </span>
+                <input 
+                  type="text"
+                  placeholder="Buscar bebida o referencia..."
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                  className="w-full pl-12 pr-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl focus:ring-2 focus:ring-black outline-none font-bold text-sm transition-all"
+                />
+             </div>
           </div>
         </div>
 
-        {/* Rango de Fechas */}
         <div className="flex flex-col md:flex-row items-end gap-4 border-t border-amber-50 pt-6">
-          <div className="w-full md:w-auto flex-1 space-y-1.5">
+          <div className="flex-1 w-full">
+             <label className="text-[10px] font-black text-black/40 uppercase tracking-widest ml-1 mb-2 block">Método de Pago</label>
+             <div className="flex gap-2 overflow-x-auto pb-2 scrollbar-hide">
+                <button 
+                  onClick={() => setFilterMethod('ALL')}
+                  className={`px-4 py-3 rounded-2xl text-[10px] font-black uppercase tracking-widest whitespace-nowrap transition-all border ${filterMethod === 'ALL' ? 'bg-black text-white border-black shadow-md' : 'bg-white text-black border-amber-100 hover:border-black'}`}
+                >
+                  Todos
+                </button>
+                {(['CASH_USD', 'PAGO_MOVIL', 'CASH_VES', 'CARD'] as PaymentMethod[]).map(method => (
+                  <button 
+                    key={method}
+                    onClick={() => setFilterMethod(method)}
+                    className={`px-4 py-3 rounded-2xl text-[10px] font-black uppercase tracking-widest whitespace-nowrap transition-all border ${filterMethod === method ? 'bg-black text-white border-black shadow-md' : 'bg-white text-black border-amber-100 hover:border-black'}`}
+                  >
+                    {getPaymentLabel(method)}
+                  </button>
+                ))}
+             </div>
+          </div>
+          
+          <div className="w-full md:w-44 space-y-1.5">
             <label className="text-[10px] font-black text-black/40 uppercase tracking-widest ml-1">Desde</label>
             <input 
               type="date"
@@ -143,7 +162,7 @@ const SalesHistory: React.FC<Props> = ({ sales, formatCurrency, onDeleteSale }) 
               className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl focus:ring-2 focus:ring-black outline-none font-bold text-sm text-black"
             />
           </div>
-          <div className="w-full md:w-auto flex-1 space-y-1.5">
+          <div className="w-full md:w-44 space-y-1.5">
             <label className="text-[10px] font-black text-black/40 uppercase tracking-widest ml-1">Hasta</label>
             <input 
               type="date"
@@ -156,113 +175,135 @@ const SalesHistory: React.FC<Props> = ({ sales, formatCurrency, onDeleteSale }) 
             onClick={clearFilters}
             className="w-full md:w-auto px-6 py-3.5 bg-amber-50 text-black hover:bg-amber-100 rounded-2xl text-[10px] font-black uppercase tracking-widest transition-all"
           >
-            Limpiar Filtros
+            Reset
           </button>
         </div>
       </div>
 
-      {/* Stats Cards dinámicos */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-        <StatCard label="Operaciones Encontradas" value={stats.count.toString()} sub="Ventas filtradas" />
-        <StatCard label="Total USD Filtrado" value={formatCurrency(stats.totalUSD, 'USD')} sub="Suma del período" />
-        <StatCard label="Total VES Filtrado" value={formatCurrency(stats.totalVES, 'VES')} sub="Suma del período" />
-      </div>
-
-      <div className="bg-white rounded-[2.5rem] border border-amber-100 overflow-hidden shadow-sm text-black">
-        <div className="p-6 border-b border-amber-100 flex justify-between items-center bg-amber-50/10">
-          <h3 className="font-black text-black uppercase tracking-widest text-xs">Registro de Transacciones</h3>
-          <span className="text-[10px] font-bold text-slate-400 uppercase">
-            Mostrando {filteredSales.length} de {sales.length}
-          </span>
+      {/* Área Imprimible */}
+      <div ref={contentToPrint} className="space-y-8 bg-transparent p-4 print:p-0">
+        {/* Cabecera exclusiva para impresión */}
+        <div className="hidden print:block mb-8 text-center border-b-2 border-black pb-6">
+          <h1 className="brand-font text-4xl font-black text-[#d61c2e] uppercase tracking-tighter">Dolce Fusión</h1>
+          <h2 className="text-xl font-bold uppercase tracking-widest text-black/60">Reporte de Ventas</h2>
+          <div className="mt-4 flex justify-between text-xs font-bold uppercase">
+            <span>Fecha Reporte: {new Date().toLocaleDateString()}</span>
+            <span>Rango: {startDate || 'Inicio'} - {endDate || 'Fin'}</span>
+          </div>
         </div>
-        
-        <div className="overflow-x-auto">
-          <table className="w-full text-left">
-            <thead className="bg-slate-50/50 border-b border-amber-100">
-              <tr>
-                <th className="px-6 py-4 text-[10px] font-black text-black uppercase tracking-widest">Fecha / Hora</th>
-                <th className="px-6 py-4 text-[10px] font-black text-black uppercase tracking-widest">Productos</th>
-                <th className="px-6 py-4 text-[10px] font-black text-black uppercase tracking-widest text-center">Pago</th>
-                <th className="px-6 py-4 text-[10px] font-black text-black uppercase tracking-widest text-center">Tasa</th>
-                <th className="px-6 py-4 text-[10px] font-black text-black uppercase tracking-widest text-right">Total</th>
-                <th className="px-6 py-4 text-[10px] font-black text-black uppercase tracking-widest text-center">Acciones</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-slate-100">
-              {filteredSales.map(sale => (
-                <tr key={sale.id} className="hover:bg-amber-50/20 transition-colors group">
-                  <td className="px-6 py-4">
-                    <div className="font-black text-black text-xs uppercase">
-                      {formatDate(sale.timestamp)}
-                    </div>
-                    <div className="text-[10px] text-[#d61c2e] font-black uppercase tracking-tight">
-                      {new Date(sale.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                    </div>
-                  </td>
-                  <td className="px-6 py-4">
-                    <div className="space-y-1">
-                      {sale.items.map((item, idx) => (
-                        <div key={idx} className="text-[10px] font-bold text-black/80 uppercase flex items-center gap-1">
-                          <span className="inline-flex items-center justify-center bg-amber-100 text-amber-900 w-5 h-5 rounded-md font-black text-[9px] mr-1">{item.quantity}</span> 
-                          {item.name}
-                        </div>
-                      ))}
-                    </div>
-                  </td>
-                  <td className="px-6 py-4 text-center">
-                    <div className="flex flex-col items-center gap-1">
-                      <span className={`inline-block px-3 py-1.5 rounded-xl text-[9px] font-black uppercase tracking-widest shadow-sm
-                        ${sale.paymentMethod === 'CASH_USD' ? 'bg-green-100 text-green-800' : 
-                          sale.paymentMethod === 'PAGO_MOVIL' ? 'bg-blue-100 text-blue-800' : 
-                          'bg-slate-800 text-white'}
-                      `}>
-                        {getPaymentLabel(sale.paymentMethod)}
-                      </span>
-                      {sale.reference && (
-                        <span className="text-[8px] font-black text-slate-400 uppercase tracking-widest">
-                          Ref: {sale.reference}
-                        </span>
-                      )}
-                    </div>
-                  </td>
-                  <td className="px-6 py-4 text-center">
-                    <div className="text-[10px] font-black text-slate-500 uppercase tracking-tighter">
-                      Bs. {sale.exchangeRate.toFixed(2)}
-                    </div>
-                  </td>
-                  <td className="px-6 py-4 text-right">
-                    <div className="font-black text-black text-sm">{formatCurrency(sale.totalUSD, 'USD')}</div>
-                    <div className="text-[9px] text-slate-400 font-bold tracking-tighter uppercase">
-                      {formatCurrency(sale.totalVES, 'VES')}
-                    </div>
-                  </td>
-                  <td className="px-6 py-4 text-center">
-                    <button 
-                      onClick={() => handleDelete(sale.id)}
-                      className="p-2 text-slate-300 hover:text-red-600 hover:bg-red-50 rounded-xl transition-all"
-                      title="Eliminar registro"
-                    >
-                      <Icons.Trash />
-                    </button>
-                  </td>
+
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+          <StatCard label="Operaciones Encontradas" value={stats.count.toString()} sub="Ventas filtradas" />
+          <StatCard label="Total USD Filtrado" value={formatCurrency(stats.totalUSD, 'USD')} sub="Suma del período" />
+          <StatCard label="Total VES Filtrado" value={formatCurrency(stats.totalVES, 'VES')} sub="Suma del período" />
+        </div>
+
+        <div className="bg-white rounded-[2.5rem] border border-amber-100 overflow-hidden shadow-sm text-black print:border-none print:shadow-none">
+          <div className="p-6 border-b border-amber-100 flex justify-between items-center bg-amber-50/10 print:hidden">
+            <h3 className="font-black text-black uppercase tracking-widest text-xs">Registro de Transacciones</h3>
+            <span className="text-[10px] font-bold text-slate-400 uppercase">
+              Mostrando {filteredSales.length} de {sales.length}
+            </span>
+          </div>
+          
+          <div className="overflow-x-auto">
+            <table className="w-full text-left border-collapse">
+              <thead className="bg-slate-50/50 border-b border-amber-100">
+                <tr>
+                  <th className="px-6 py-4 text-[10px] font-black text-black uppercase tracking-widest">Fecha / Hora</th>
+                  <th className="px-6 py-4 text-[10px] font-black text-black uppercase tracking-widest">Productos</th>
+                  <th className="px-6 py-4 text-[10px] font-black text-black uppercase tracking-widest text-center">Pago</th>
+                  <th className="px-6 py-4 text-[10px] font-black text-black uppercase tracking-widest text-right">Total</th>
+                  <th className="px-6 py-4 text-[10px] font-black text-black uppercase tracking-widest text-center print:hidden">Acciones</th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
-          {filteredSales.length === 0 && (
-            <div className="p-24 text-center">
-              <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-amber-50 mb-4">
-                <Icons.History />
-              </div>
-              <p className="font-black uppercase tracking-widest text-[10px] text-slate-400">No se encontraron ventas con los criterios seleccionados</p>
-              <button 
-                onClick={clearFilters}
-                className="mt-4 text-[10px] font-black text-[#d61c2e] uppercase underline tracking-widest"
-              >
-                Resetear todos los filtros
-              </button>
+              </thead>
+              <tbody className="divide-y divide-slate-100">
+                {filteredSales.map(sale => (
+                  <tr key={sale.id} className="hover:bg-amber-50/20 transition-colors group">
+                    <td className="px-6 py-4">
+                      <div className="font-black text-black text-xs uppercase">
+                        {formatDate(sale.timestamp)}
+                      </div>
+                      <div className="text-[10px] text-[#d61c2e] font-black uppercase tracking-tight">
+                        {new Date(sale.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                      </div>
+                    </td>
+                    <td className="px-6 py-4">
+                      <div className="space-y-1">
+                        {sale.items.map((item, idx) => (
+                          <div key={idx} className="text-[10px] font-bold text-black/80 uppercase flex items-center gap-1">
+                            <span className="inline-flex items-center justify-center bg-amber-100 text-amber-900 w-5 h-5 rounded-md font-black text-[9px] mr-1 print:bg-gray-100 print:text-black">{item.quantity}</span> 
+                            {item.name}
+                          </div>
+                        ))}
+                      </div>
+                    </td>
+                    <td className="px-6 py-4 text-center">
+                      <div className="flex flex-col items-center gap-1">
+                        <span className={`inline-block px-3 py-1.5 rounded-xl text-[9px] font-black uppercase tracking-widest shadow-sm print:bg-white print:border print:border-black print:text-black
+                          ${sale.paymentMethod === 'CASH_USD' ? 'bg-green-100 text-green-800' : 
+                            sale.paymentMethod === 'PAGO_MOVIL' ? 'bg-blue-100 text-blue-800' : 
+                            'bg-slate-800 text-white'}
+                        `}>
+                          {getPaymentLabel(sale.paymentMethod)}
+                        </span>
+                        {sale.reference && (
+                          <span className="text-[8px] font-black text-slate-400 uppercase tracking-widest">
+                            Ref: {sale.reference}
+                          </span>
+                        )}
+                      </div>
+                    </td>
+                    <td className="px-6 py-4 text-right">
+                      <div className="font-black text-black text-sm">{formatCurrency(sale.totalUSD, 'USD')}</div>
+                      <div className="text-[9px] text-slate-400 font-bold tracking-tighter uppercase">
+                        {formatCurrency(sale.totalVES, 'VES')}
+                      </div>
+                    </td>
+                    <td className="px-6 py-4 text-center print:hidden">
+                      <button 
+                        onClick={() => handleDelete(sale.id)}
+                        className="p-2 text-slate-300 hover:text-red-600 hover:bg-red-50 rounded-xl transition-all"
+                        title="Eliminar registro"
+                      >
+                        <Icons.Trash />
+                      </button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+            
+            {/* Pie de página exclusivo para impresión */}
+            <div className="hidden print:block p-8 border-t-2 border-black mt-4">
+               <div className="flex justify-between items-end">
+                  <div className="text-[10px] font-bold text-black/40">
+                    <p>Documento generado digitalmente por Dolce Fusión System.</p>
+                    <p>Fin del reporte de transacciones.</p>
+                  </div>
+                  <div className="text-right">
+                    <p className="text-xs font-black uppercase tracking-widest">Total Reportado</p>
+                    <p className="text-2xl font-black">{formatCurrency(stats.totalUSD, 'USD')}</p>
+                    <p className="text-sm font-bold text-black/60">{formatCurrency(stats.totalVES, 'VES')}</p>
+                  </div>
+               </div>
             </div>
-          )}
+
+            {filteredSales.length === 0 && (
+              <div className="p-24 text-center">
+                <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-amber-50 mb-4">
+                  <Icons.History />
+                </div>
+                <p className="font-black uppercase tracking-widest text-[10px] text-slate-400">No se encontraron ventas con los criterios seleccionados</p>
+                <button 
+                  onClick={clearFilters}
+                  className="mt-4 text-[10px] font-black text-[#d61c2e] uppercase underline tracking-widest print:hidden"
+                >
+                  Resetear todos los filtros
+                </button>
+              </div>
+            )}
+          </div>
         </div>
       </div>
     </div>
